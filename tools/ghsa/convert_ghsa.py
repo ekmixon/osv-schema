@@ -143,18 +143,15 @@ def convert(ghsa: Dict[str, Any]):
         ghsa['updatedAt'],
     }
 
-    # Split up the dict assignments to preserve order of date related fields.
-    withdrawn = ghsa.get('withdrawnAt')
-    if withdrawn:
+    if withdrawn := ghsa.get('withdrawnAt'):
         osv['withdrawn'] = withdrawn
 
-    osv.update({
-        'summary':
-        ghsa['summary'],
-        'details':
-        ghsa['description'],
-        'references': [convert_reference(ref) for ref in ghsa['references']]
-    })
+    osv |= {
+        'summary': ghsa['summary'],
+        'details': ghsa['description'],
+        'references': [convert_reference(ref) for ref in ghsa['references']],
+    }
+
 
     osv['affected'] = get_affected(ghsa)
     return osv
@@ -240,19 +237,21 @@ def get_affected(ghsa: Dict[str, Any]):
             else:
                 affects_all_prior = True
 
-            if ghsa_range.upper:
-                if ghsa_range.upper.operator == '<=':
-                    if first_patched:
-                        current_events.append({'fixed': first_patched})
-
-                    # OSV ranges only allow < and not <=. If there is no patch, then all
-                    # versions from beginning of time are affected.
-                elif ghsa_range.upper.operator == '<':
-                    current_events.append({'fixed': ghsa_range.upper.version})
-            elif first_patched:
-                # No upper bound set in the range, check the firstPatchedVersion.
+            if (
+                ghsa_range.upper
+                and ghsa_range.upper.operator == '<='
+                and first_patched
+                or not ghsa_range.upper
+                and first_patched
+            ):
                 current_events.append({'fixed': first_patched})
 
+            elif (
+                (not ghsa_range.upper or ghsa_range.upper.operator != '<=')
+                and (not ghsa_range.upper or ghsa_range.upper.operator == '<')
+                and ghsa_range.upper
+            ):
+                current_events.append({'fixed': ghsa_range.upper.version})
         if affects_all_prior:
             current_events.insert(0, {'introduced': '0'})
 

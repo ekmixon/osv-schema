@@ -75,7 +75,9 @@ def run_graphql(query: str, token: str):
     response = requests.post(
         'https://api.github.com/graphql',
         json={'query': query},
-        headers={'Authorization': 'Bearer ' + token})
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
     response.raise_for_status()
     return response.json()
 
